@@ -33,7 +33,7 @@ from f5_tts.infer.utils_infer import (
 
 
 parser = argparse.ArgumentParser(
-    prog="python3 infer-cli.py",
+    prog="python infer-cli.py",
     description="Commandline interface for E2/F5 TTS with Advanced Batch Processing.",
     epilog="Specify options above to override one or more settings from config.",
 )
@@ -126,7 +126,7 @@ parser.add_argument(
 parser.add_argument(
     "--load_vocoder_from_local",
     action="store_true",
-    help="To load vocoder from local dir, default to ../checkpoints/vocos-mel-24khz",
+    help="To load vocoder from local dir",
 )
 parser.add_argument(
     "--vocoder_name",
@@ -254,7 +254,7 @@ if save_chunk:
 # load vocoder
 
 if vocoder_name == "vocos":
-    vocoder_local_path = "../checkpoints/vocos-mel-24khz"
+    vocoder_local_path = "/home/niko/Dev/book_expert/F5-TTS/ckpts"
 elif vocoder_name == "bigvgan":
     vocoder_local_path = "../checkpoints/bigvgan_v2_24khz_100band_256x"
 
@@ -288,7 +288,7 @@ elif model == "E2TTS_Base":
     ckpt_step = 1200000
 
 if not ckpt_file:
-    ckpt_file = str(cached_path(f"hf://SWivid/{repo_name}/{model}/model_{ckpt_step}.{ckpt_type}"))
+    ckpt_file = str(cached_path(f"/home/niko/Dev/book_expert/F5-TTS/ckpts/{model}/model_{ckpt_step}.{ckpt_type}"))
 
 print(f"Using {model}...")
 ema_model = load_model(

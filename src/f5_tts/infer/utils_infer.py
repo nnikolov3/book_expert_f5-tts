@@ -1,5 +1,21 @@
 # A unified script for inference process
 # Make adjustments inside functions, and consider both gradio and cli scripts if need to change func output format
+from f5_tts.model.utils import convert_char_to_pinyin, get_tokenizer
+from f5_tts.model import CFM
+from vocos import Vocos
+from transformers import pipeline
+from pydub import AudioSegment, silence
+from huggingface_hub import hf_hub_download
+import tqdm
+import torchaudio
+import torch
+import numpy as np
+import matplotlib.pylab as plt
+import matplotlib
+from importlib.resources import files
+import tempfile
+import re
+import hashlib
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -8,28 +24,8 @@ from concurrent.futures import ThreadPoolExecutor
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # for MPS device compatibility
 sys.path.append(f"{os.path.dirname(os.path.abspath(__file__))}/../../third_party/BigVGAN/")
 
-import hashlib
-import re
-import tempfile
-from importlib.resources import files
-
-import matplotlib
-
 
 matplotlib.use("Agg")
-
-import matplotlib.pylab as plt
-import numpy as np
-import torch
-import torchaudio
-import tqdm
-from huggingface_hub import hf_hub_download
-from pydub import AudioSegment, silence
-from transformers import pipeline
-from vocos import Vocos
-
-from f5_tts.model import CFM
-from f5_tts.model.utils import convert_char_to_pinyin, get_tokenizer
 
 
 _ref_audio_cache = {}
@@ -114,7 +110,7 @@ def load_vocoder(vocoder_name="vocos", is_local=False, local_path="", device=dev
             config_path = hf_hub_download(repo_id=repo_id, cache_dir=hf_cache_dir, filename="config.yaml")
             model_path = hf_hub_download(repo_id=repo_id, cache_dir=hf_cache_dir, filename="pytorch_model.bin")
         vocoder = Vocos.from_hparams(config_path)
-        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+        state_dict = torch.load(model_path, map_location="cuda", weights_only=True)
         from vocos.feature_extractors import EncodecFeatures
 
         if isinstance(vocoder.feature_extractor, EncodecFeatures):
@@ -175,8 +171,7 @@ def transcribe(ref_audio, language=None):
         initialize_asr_pipeline(device=device)
     return asr_pipe(
         ref_audio,
-        chunk_length_s=30,
-        batch_size=128,
+        batch_size=1024,
         generate_kwargs={"task": "transcribe", "language": language} if language else {"task": "transcribe"},
         return_timestamps=False,
     )["text"].strip()
@@ -474,7 +469,7 @@ def infer_batch_process(
 
         # Prepare the text
         text_list = [ref_text + gen_text]
-        final_text_list = convert_char_to_pinyin(text_list)
+        final_text_list = text_list
 
         ref_audio_len = audio.shape[-1] // hop_length
         if fix_duration is not None:
@@ -497,7 +492,8 @@ def infer_batch_process(
             )
             del _
 
-            generated = generated.to(torch.float32)  # generated mel spectrogram
+            # generated mel spectrogram
+            generated = generated.to(torch.float32)
             generated = generated[:, ref_audio_len:, :]
             generated = generated.permute(0, 2, 1)
             if mel_spec_type == "vocos":
